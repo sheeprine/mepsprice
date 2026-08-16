@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% block title %}{{ product.title }} — MepsPrice{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<div class="mb-6">
+  <a href="/" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+    </svg>
+    All Products
+  </a>
+
+  <div class="flex items-start gap-5">
+    {% if product.image_url %}
+    <img src="{{ product.image_url }}" alt="{{ product.title }}"
+      class="w-24 h-24 object-cover rounded-xl bg-gray-100 shrink-0 shadow-sm"/>
+    {% endif %}
+    <div class="flex-1 min-w-0">
+      <h1 class="text-xl font-bold text-gray-800 leading-snug">{{ product.title }}</h1>
+      <a href="{{ product.product_url }}" target="_blank"
+        class="text-sm text-brand-600 hover:underline mt-1 inline-block">
+        View on mepsking.shop ↗
+      </a>
+      <p class="text-xs text-gray-400 mt-1">Last checked {{ time_ago(product.last_checked_at) }}</p>
+    </div>
+    <div class="flex gap-2 shrink-0">
+      <form method="post" action="/products/{{ product.handle }}/check">
+        <button type="submit"
+          class="inline-flex items-center gap-1.5 text-sm border border-gray-300 hover:border-gray-400 text-gray-600 px-3 py-1.5 rounded-lg transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Check Now
+        </button>
+      </form>
+      <form method="post" action="/products/{{ product.handle }}/delete"
+        onsubmit="return confirm('Remove this product from tracking?')">
+        <button type="submit"
+          class="inline-flex items-center gap-1.5 text-sm border border-red-200 hover:border-red-400 text-red-500 hover:text-red-600 px-3 py-1.5 rounded-lg transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+          Remove
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% if not variant_data %}
+<div class="text-center py-16 text-gray-400">No price data available yet. Click "Check Now" to fetch prices.</div>
+{% else %}
+
+<!-- Variants summary table -->
+<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-6">
+  <div class="px-5 py-3 border-b border-gray-100">
+    <h2 class="font-semibold text-gray-700 text-sm">Current Prices</h2>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+        <tr>
+          <th class="px-5 py-3 text-left">Variant</th>
+          <th class="px-5 py-3 text-right">Current</th>
+          {% if has_multi_pack %}<th class="px-5 py-3 text-right">Per Item</th>{% endif %}
+          <th class="px-5 py-3 text-right">Original (RRP)</th>
+          <th class="px-5 py-3 text-right">First Tracked</th>
+          <th class="px-5 py-3 text-right">Change</th>
+          <th class="px-5 py-3 text-right">Changes</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for v in variant_data %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-5 py-3 font-medium text-gray-800">
+            {{ v.variant.name }}
+            {% if v.variant.sku %}
+            <span class="ml-1.5 text-xs font-normal text-gray-400">{{ v.variant.sku }}</span>
+            {% endif %}
+          </td>
+          <td class="px-5 py-3 text-right font-semibold text-gray-900">${{ "%.2f"|format(v.latest_price) }}</td>
+          {% if has_multi_pack %}
+          <td class="px-5 py-3 text-right text-gray-500">${{ "%.2f"|format(v.price_per_unit) }}</td>
+          {% endif %}
+          <td class="px-5 py-3 text-right text-gray-400">
+            {% if v.compare_at_price %}${{ "%.2f"|format(v.compare_at_price) }}{% else %}—{% endif %}
+          </td>
+          <td class="px-5 py-3 text-right text-gray-500">${{ "%.2f"|format(v.first_price) }}</td>
+          <td class="px-5 py-3 text-right">
+            {% if v.change_pct < 0 %}
+            <span class="font-semibold text-emerald-600">↓ {{ v.change_pct }}%</span>
+            {% elif v.change_pct > 0 %}
+            <span class="font-semibold text-red-500">↑ +{{ v.change_pct }}%</span>
+            {% else %}
+            <span class="text-gray-400">—</span>
+            {% endif %}
+          </td>
+          <td class="px-5 py-3 text-right text-gray-400">{{ v.change_count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Price history chart -->
+<div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="font-semibold text-gray-700 text-sm">Price History</h2>
+    <div class="flex gap-1" id="rangeButtons">
+      <button data-days="15"  class="range-btn px-2.5 py-1 text-xs rounded-md border border-brand-500 bg-brand-50 text-brand-600 transition-colors">15d</button>
+      <button data-days="30"  class="range-btn px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors">1m</button>
+      <button data-days="90"  class="range-btn px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors">3m</button>
+      <button data-days="180" class="range-btn px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors">6m</button>
+      <button data-days="all" class="range-btn px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors">All</button>
+    </div>
+  </div>
+  <div class="relative" style="height: 320px;">
+    <canvas id="priceChart"></canvas>
+  </div>
+</div>
+
+<script>
+(function() {
+  const datasets = {{ chart_datasets_json|safe }};
+  const allLabels = {{ chart_labels_json|safe }};
+
+  const COLORS = [
+    '#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'
+  ];
+
+  const priceMaps = datasets.map(ds => {
+    const m = {};
+    ds.labels.forEach((l, j) => { m[l] = ds.data[j]; });
+    return m;
+  });
+
+  function parseLabel(l) {
+    return new Date(l.replace(' ', 'T'));
+  }
+
+  function formatDate(d) {
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function getRangeData(days) {
+    const cutoff = days === 'all' ? null : (() => {
+      const d = new Date(); d.setDate(d.getDate() - days); return d;
+    })();
+
+    let labels = cutoff
+      ? allLabels.filter(l => parseLabel(l) >= cutoff)
+      : [...allLabels];
+
+    // For each dataset, find the last known price before the cutoff
+    const carryovers = datasets.map((ds, i) => {
+      if (!cutoff) return null;
+      let last = null;
+      for (const l of allLabels) {
+        if (parseLabel(l) >= cutoff) break;
+        if (priceMaps[i][l] !== undefined) last = priceMaps[i][l];
+      }
+      return last;
+    });
+
+    const nowLabel = formatDate(new Date());
+
+    // If no labels fall within the range but there is historical data,
+    // synthesise a flat-line from range start to now
+    if (labels.length === 0 && carryovers.some(c => c !== null)) {
+      labels = [formatDate(cutoff), nowLabel];
+    } else if (labels[labels.length - 1] !== nowLabel) {
+      // Always extend to now so the stepped line reaches the current time
+      labels = [...labels, nowLabel];
+    }
+
+    // Build data arrays: start from carryover, forward-fill any gaps
+    const data = datasets.map((ds, i) => {
+      let current = carryovers[i];
+      return labels.map(l => {
+        if (priceMaps[i][l] !== undefined) current = priceMaps[i][l];
+        return current;
+      });
+    });
+
+    return { labels, data };
+  }
+
+  const initial = getRangeData(15);
+
+  const chartDatasets = datasets.map((ds, i) => ({
+    label: ds.label,
+    data: initial.data[i],
+    borderColor: COLORS[i % COLORS.length],
+    backgroundColor: COLORS[i % COLORS.length] + '18',
+    borderWidth: 2,
+    pointRadius: initial.labels.length > 20 ? 2 : 4,
+    pointHoverRadius: 6,
+    stepped: 'before',
+    fill: false,
+    spanGaps: false,
+  }));
+
+  const chart = new Chart(document.getElementById('priceChart'), {
+    type: 'line',
+    data: { labels: initial.labels, datasets: chartDatasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: $${ctx.parsed.y?.toFixed(2) ?? 'N/A'}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            maxRotation: 45,
+            autoSkip: true,
+            maxTicksLimit: 12,
+            color: '#9ca3af',
+            font: { size: 11 }
+          },
+          grid: { color: '#f3f4f6' }
+        },
+        y: {
+          ticks: {
+            callback: v => '$' + v.toFixed(2),
+            color: '#9ca3af',
+            font: { size: 11 }
+          },
+          grid: { color: '#f3f4f6' }
+        }
+      }
+    }
+  });
+
+  function applyRange(days) {
+    const { labels, data } = getRangeData(days);
+    chart.data.labels = labels;
+    chart.data.datasets.forEach((ds, i) => {
+      ds.data = data[i];
+      ds.pointRadius = labels.length > 20 ? 2 : 4;
+    });
+    chart.update();
+  }
+
+  document.querySelectorAll('.range-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.range-btn').forEach(b => {
+        b.classList.remove('border-brand-500', 'bg-brand-50', 'text-brand-600');
+        b.classList.add('border-gray-200', 'text-gray-500');
+      });
+      btn.classList.remove('border-gray-200', 'text-gray-500');
+      btn.classList.add('border-brand-500', 'bg-brand-50', 'text-brand-600');
+
+      const days = btn.dataset.days === 'all' ? 'all' : parseInt(btn.dataset.days);
+      applyRange(days);
+    });
+  });
+})();
+</script>
+
+{% endif %}
+{% endblock %}

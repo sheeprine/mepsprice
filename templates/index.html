@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}MepsPrice — Tracked Products{% endblock %}
+
+{% block content %}
+
+{% if not summaries %}
+<div class="text-center py-24">
+  <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-brand-50 mb-4">
+    <svg class="w-8 h-8 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+    </svg>
+  </div>
+  <h2 class="text-xl font-semibold text-gray-700 mb-2">No products tracked yet</h2>
+  <p class="text-gray-500 mb-6">Paste a mepsking.shop product URL to start tracking its price.</p>
+  <a href="/add"
+    class="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-medium px-6 py-3 rounded-lg transition-colors">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    Track your first product
+  </a>
+</div>
+
+{% else %}
+
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold text-gray-800">Tracked Products
+    <span class="ml-2 text-base font-normal text-gray-400">({{ summaries|length }})</span>
+  </h1>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+  {% for s in summaries %}
+  {% set product = s.product %}
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
+
+    {% if product.image_url %}
+    <a href="/products/{{ product.handle }}">
+      <img src="{{ product.image_url }}" alt="{{ product.title }}"
+        class="w-full h-44 object-cover bg-gray-100"/>
+    </a>
+    {% else %}
+    <div class="w-full h-44 bg-gray-100 flex items-center justify-center">
+      <svg class="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+      </svg>
+    </div>
+    {% endif %}
+
+    <div class="p-4 flex flex-col flex-1">
+      <h2 class="font-semibold text-gray-800 text-sm leading-snug mb-3 line-clamp-2">
+        <a href="/products/{{ product.handle }}" class="hover:text-brand-600 transition-colors">
+          {{ product.title }}
+        </a>
+      </h2>
+
+      <div class="mt-auto">
+        {% if s.min_price is not none %}
+        <div class="flex items-end gap-2 mb-1">
+          {% if s.has_multi_pack %}
+          <span class="text-2xl font-bold text-gray-900">${{ "%.2f"|format(s.best_per_unit) }}<span class="text-sm font-normal text-gray-400">/item</span></span>
+          {% else %}
+          <span class="text-2xl font-bold text-gray-900">${{ "%.2f"|format(s.min_price) }}</span>
+          {% endif %}
+          {% if s.change_pct is not none %}
+            {% if s.change_pct < 0 %}
+            <span class="text-sm font-semibold text-emerald-600 mb-0.5">
+              ↓ {{ s.change_pct }}%
+            </span>
+            {% elif s.change_pct > 0 %}
+            <span class="text-sm font-semibold text-red-500 mb-0.5">
+              ↑ +{{ s.change_pct }}%
+            </span>
+            {% else %}
+            <span class="text-sm text-gray-400 mb-0.5">no change</span>
+            {% endif %}
+          {% endif %}
+        </div>
+        {% if s.has_multi_pack %}
+        <p class="text-xs text-gray-400 -mt-0.5 mb-1">Best deal: {{ s.best_per_unit_variant }}</p>
+        {% endif %}
+        {% else %}
+        <p class="text-sm text-gray-400 mb-1">No price data yet</p>
+        {% endif %}
+
+        <div class="flex items-center justify-between text-xs text-gray-400 mt-2">
+          <span>{{ s.variant_count }} variant{{ 's' if s.variant_count != 1 }}</span>
+          <span>checked {{ time_ago(product.last_checked_at) }}</span>
+        </div>
+
+        <a href="/products/{{ product.handle }}"
+          class="mt-3 block text-center text-sm font-medium text-brand-600 hover:text-brand-700 border border-brand-200 hover:border-brand-400 rounded-lg py-1.5 transition-colors">
+          View Details
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endif %}
+{% endblock %}

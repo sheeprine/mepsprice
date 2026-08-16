@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}MepsPrice{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50:'#eff6ff', 100:'#dbeafe', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8' }
+          }
+        }
+      }
+    }
+  </script>
+  {% block head %}{% endblock %}
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <nav class="bg-white border-b border-gray-200 shadow-sm">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-2 text-xl font-bold text-brand-600">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+        </svg>
+        MepsPrice
+      </a>
+      <div class="flex items-center gap-2">
+        <a href="/add"
+          class="inline-flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          Track Product
+        </a>
+        {% if request.session.get("is_admin") %}
+        <form method="post" action="/admin/logout">
+          <button type="submit"
+            class="inline-flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-medium px-3 py-2 rounded-lg transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+            </svg>
+            Logout
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-6xl mx-auto px-4 py-8">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="border-t border-gray-200 mt-12 py-6 text-center text-sm text-gray-400">
+    MepsPrice &mdash; tracking prices on <a href="https://www.mepsking.shop" target="_blank" class="underline hover:text-gray-600">mepsking.shop</a>
+  </footer>
+
+</body>
+</html>

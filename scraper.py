@@ -76,7 +76,7 @@ def parse_product(raw: dict) -> dict:
         for spec in offers.get("priceSpecification", []):
             if spec.get("priceType") == "https://schema.org/StrikethroughPrice":
                 compare_at_price = float(spec["price"])
-            else:
+            elif not spec.get("validForMemberTier"):
                 price = float(spec["price"])
 
         if price is None and offers.get("price") is not None:

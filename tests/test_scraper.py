@@ -149,6 +149,31 @@ class TestParseProduct:
         v = parse_product(raw)["variants"][0]
         assert v["name"] == "Default"
 
+    def test_vip_member_price_is_ignored(self):
+        raw = {
+            "@type": "ProductGroup",
+            "name": "Test Motor",
+            "url": "https://www.mepsking.shop/test-motor.html",
+            "hasVariant": [
+                {
+                    "sku": "111",
+                    "productId": "T-001",
+                    "name": "Test Motor-1900KV",
+                    "image": [],
+                    "offers": {
+                        "priceSpecification": [
+                            {"price": 16.90, "priceCurrency": "USD"},
+                            {"priceType": "https://schema.org/StrikethroughPrice", "price": 26.90, "priceCurrency": "USD"},
+                            {"price": 15.90, "priceCurrency": "USD", "validForMemberTier": {"@type": "MemberProgramTier", "name": "vip_membership"}},
+                        ]
+                    },
+                }
+            ],
+        }
+        v = parse_product(raw)["variants"][0]
+        assert v["price"] == 16.90
+        assert v["compare_at_price"] == 26.90
+
     def test_multiple_variants_prices(self):
         result = parse_product(FAKE_PRODUCT_GROUP)
         assert result["variants"][0]["price"] == 16.90

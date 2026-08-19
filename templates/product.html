@@ -68,6 +68,7 @@
       <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
         <tr>
           <th class="px-5 py-3 text-left">Variant</th>
+          <th class="px-5 py-3 text-left">Status</th>
           <th class="px-5 py-3 text-right">Current</th>
           {% if has_multi_pack %}<th class="px-5 py-3 text-right">Per Item</th>{% endif %}
           <th class="px-5 py-3 text-right">Original (RRP)</th>
@@ -84,8 +85,12 @@
             {% if v.variant.sku %}
             <span class="ml-1.5 text-xs font-normal text-gray-400">{{ v.variant.sku }}</span>
             {% endif %}
-            {% if not v.in_stock %}
-            <span class="ml-2 text-xs font-medium text-red-500 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">Out of stock</span>
+          </td>
+          <td class="px-5 py-3">
+            {% if v.in_stock %}
+            <span class="text-xs font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">In stock</span>
+            {% else %}
+            <span class="text-xs font-medium text-red-500 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">Out of stock</span>
             {% endif %}
           </td>
           <td class="px-5 py-3 text-right font-semibold text-gray-900">${{ "%.2f"|format(v.latest_price) }}</td>

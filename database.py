@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 def _utcnow():
     return datetime.now(timezone.utc)
 from sqlalchemy import (
-    create_engine, Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text
+    create_engine, Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, inspect, text
 )
 from sqlalchemy.orm import DeclarativeBase, relationship, Session
 
@@ -54,6 +54,7 @@ class PriceCheck(Base):
     variant_id = Column(Integer, ForeignKey("variants.id"), nullable=False)
     price = Column(Float, nullable=False)
     compare_at_price = Column(Float)
+    in_stock = Column(Boolean, nullable=False, default=True, server_default="1")
     checked_at = Column(DateTime, default=_utcnow)
 
     variant = relationship("Variant", back_populates="price_checks")
@@ -64,5 +65,16 @@ def get_db():
         yield session
 
 
+def _migrate_db():
+    with engine.connect() as conn:
+        existing_columns = {col["name"] for col in inspect(engine).get_columns("price_checks")}
+        if "in_stock" not in existing_columns:
+            conn.execute(text(
+                "ALTER TABLE price_checks ADD COLUMN in_stock BOOLEAN NOT NULL DEFAULT 1"
+            ))
+            conn.commit()
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
+    _migrate_db()

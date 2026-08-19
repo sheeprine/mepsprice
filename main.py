@@ -233,6 +233,7 @@ def track_product(
                 variant_id=variant.id,
                 price=v_data["price"],
                 compare_at_price=v_data["compare_at_price"],
+                in_stock=v_data["in_stock"],
             )
             db.add(check)
         else:
@@ -269,6 +270,7 @@ def product_detail(request: Request, handle: str, db: Session = Depends(get_db))
         first_price = checks[0].price
         latest_price = checks[-1].price
         compare_at = checks[-1].compare_at_price
+        in_stock = checks[-1].in_stock
         change_pct = round((latest_price - first_price) / first_price * 100, 1) if first_price else 0
         pack_count = extract_pack_count(variant.name)
         if pack_count == 1 and len(tracked_variants) == 1:
@@ -280,6 +282,7 @@ def product_detail(request: Request, handle: str, db: Session = Depends(get_db))
                 "first_price": first_price,
                 "latest_price": latest_price,
                 "compare_at_price": compare_at,
+                "in_stock": in_stock,
                 "change_pct": change_pct,
                 "change_count": sum(1 for i in range(1, len(checks)) if checks[i].price != checks[i-1].price),
                 "pack_count": pack_count,
@@ -289,6 +292,7 @@ def product_detail(request: Request, handle: str, db: Session = Depends(get_db))
 
         labels = [c.checked_at.strftime("%Y-%m-%d %H:%M") for c in checks]
         prices = [c.price for c in checks]
+        stock = [c.in_stock for c in checks]
         for label in labels:
             all_labels.add(label)
 
@@ -297,6 +301,7 @@ def product_detail(request: Request, handle: str, db: Session = Depends(get_db))
                 "label": variant.name,
                 "labels": labels,
                 "data": prices,
+                "stock": stock,
             }
         )
 

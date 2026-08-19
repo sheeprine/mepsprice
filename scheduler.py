@@ -45,12 +45,18 @@ def check_product_prices(handle: str, session: Session | None = None):
                     .order_by(PriceCheck.checked_at.desc())
                     .first()
                 )
-                if last and last.price == v_data["price"] and last.compare_at_price == v_data["compare_at_price"]:
+                if (
+                    last
+                    and last.price == v_data["price"]
+                    and last.compare_at_price == v_data["compare_at_price"]
+                    and last.in_stock == v_data["in_stock"]
+                ):
                     continue
                 check = PriceCheck(
                     variant_id=variant.id,
                     price=v_data["price"],
                     compare_at_price=v_data["compare_at_price"],
+                    in_stock=v_data["in_stock"],
                     checked_at=now,
                 )
                 session.add(check)

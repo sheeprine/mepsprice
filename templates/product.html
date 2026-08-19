@@ -78,11 +78,14 @@
       </thead>
       <tbody class="divide-y divide-gray-100">
         {% for v in variant_data %}
-        <tr class="hover:bg-gray-50">
+        <tr class="hover:bg-gray-50 {% if not v.in_stock %}opacity-60{% endif %}">
           <td class="px-5 py-3 font-medium text-gray-800">
             {{ v.variant.name }}
             {% if v.variant.sku %}
             <span class="ml-1.5 text-xs font-normal text-gray-400">{{ v.variant.sku }}</span>
+            {% endif %}
+            {% if not v.in_stock %}
+            <span class="ml-2 text-xs font-medium text-red-500 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">Out of stock</span>
             {% endif %}
           </td>
           <td class="px-5 py-3 text-right font-semibold text-gray-900">${{ "%.2f"|format(v.latest_price) }}</td>
@@ -142,6 +145,12 @@
     return m;
   });
 
+  const stockMaps = datasets.map(ds => {
+    const m = {};
+    ds.labels.forEach((l, j) => { m[l] = ds.stock[j]; });
+    return m;
+  });
+
   function parseLabel(l) {
     return new Date(l.replace(' ', 'T'));
   }
@@ -191,7 +200,26 @@
       });
     });
 
-    return { labels, data };
+    // Build stock arrays: carry over last known stock status (default true)
+    const stockCarryovers = datasets.map((ds, i) => {
+      if (!cutoff) return null;
+      let last = true;
+      for (const l of allLabels) {
+        if (parseLabel(l) >= cutoff) break;
+        if (stockMaps[i][l] !== undefined) last = stockMaps[i][l];
+      }
+      return last;
+    });
+
+    const stockData = datasets.map((ds, i) => {
+      let current = stockCarryovers[i] !== null ? stockCarryovers[i] : true;
+      return labels.map(l => {
+        if (stockMaps[i][l] !== undefined) current = stockMaps[i][l];
+        return current;
+      });
+    });
+
+    return { labels, data, stockData };
   }
 
   const initial = getRangeData(15);
@@ -207,6 +235,9 @@
     stepped: 'before',
     fill: false,
     spanGaps: false,
+    segment: {
+      borderDash: (ctx) => initial.stockData[i][ctx.p0DataIndex] === false ? [6, 4] : undefined,
+    },
   }));
 
   const chart = new Chart(document.getElementById('priceChart'), {
@@ -248,11 +279,14 @@
   });
 
   function applyRange(days) {
-    const { labels, data } = getRangeData(days);
+    const { labels, data, stockData } = getRangeData(days);
     chart.data.labels = labels;
     chart.data.datasets.forEach((ds, i) => {
       ds.data = data[i];
       ds.pointRadius = labels.length > 20 ? 2 : 4;
+      ds.segment = {
+        borderDash: (ctx) => stockData[i][ctx.p0DataIndex] === false ? [6, 4] : undefined,
+      };
     });
     chart.update();
   }

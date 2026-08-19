@@ -96,6 +96,30 @@ class TestParseProduct:
         assert v["sku"] == "TEST-1900"
         assert v["price"] == 16.90
         assert v["compare_at_price"] == 26.90
+        assert v["in_stock"] is True
+
+    def test_out_of_stock_variant(self):
+        raw = {
+            "@type": "ProductGroup",
+            "name": "Test",
+            "url": "https://www.mepsking.shop/test.html",
+            "hasVariant": [
+                {
+                    "sku": "111",
+                    "productId": "T-001",
+                    "name": "Test-Default",
+                    "image": [],
+                    "offers": {
+                        "availability": "https://schema.org/OutOfStock",
+                        "priceSpecification": [
+                            {"@type": "UnitPriceSpecification", "price": 19.99, "priceCurrency": "USD"},
+                        ],
+                    },
+                }
+            ],
+        }
+        v = parse_product(raw)["variants"][0]
+        assert v["in_stock"] is False
 
     def test_variant_name_strips_product_prefix(self):
         result = parse_product(FAKE_PRODUCT_GROUP)

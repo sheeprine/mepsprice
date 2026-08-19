@@ -84,12 +84,16 @@ def parse_product(raw: dict) -> dict:
         if price is None:
             price = 0.0
 
+        availability = offers.get("availability", "")
+        in_stock = "OutOfStock" not in availability
+
         variants.append({
             "external_variant_id": external_id,
             "name": variant_name,
             "sku": v.get("productId", ""),
             "price": price,
             "compare_at_price": compare_at_price,
+            "in_stock": in_stock,
         })
 
     return {

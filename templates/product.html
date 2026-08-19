@@ -248,7 +248,12 @@
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } },
+        legend: {
+          position: 'top',
+          labels: { usePointStyle: true, boxWidth: 8 },
+          onHover: (e, legendItem) => { chart._hoveredLegend = legendItem; },
+          onLeave: () => { chart._hoveredLegend = null; },
+        },
         tooltip: {
           callbacks: {
             label: ctx => ` ${ctx.dataset.label}: $${ctx.parsed.y?.toFixed(2) ?? 'N/A'}`
@@ -276,6 +281,15 @@
         }
       }
     }
+  });
+
+  document.getElementById('priceChart').addEventListener('dblclick', () => {
+    const item = chart._hoveredLegend;
+    if (!item) return;
+    const idx = item.datasetIndex;
+    const onlyThis = chart.data.datasets.every((_, i) => i === idx || !chart.isDatasetVisible(i));
+    chart.data.datasets.forEach((_, i) => chart.setDatasetVisibility(i, onlyThis || i === idx));
+    chart.update();
   });
 
   function applyRange(days) {

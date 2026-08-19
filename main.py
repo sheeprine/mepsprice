@@ -226,6 +226,11 @@ def index(
 
 @app.get("/admin/login", response_class=HTMLResponse)
 def admin_login_page(request: Request, next: str = "/add"):
+    if not next.startswith("/"):
+        next = "/add"
+    if not os.environ.get("ADMIN_PASSWORD"):
+        request.session["is_admin"] = True
+        return RedirectResponse(next, status_code=303)
     return templates.TemplateResponse(request, "admin_login.html", {"next": next})
 
 

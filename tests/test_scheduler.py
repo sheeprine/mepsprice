@@ -7,7 +7,7 @@ from sqlalchemy.pool import StaticPool
 
 from database import Base, Product, Variant, PriceCheck
 from plugins import get_plugin
-from scheduler import check_product_prices, check_all_prices
+from scheduler import check_product_prices, check_all_prices, start_scheduler, stop_scheduler
 
 FAKE_RAW = {
     "@context": "https://schema.org/",
@@ -240,3 +240,48 @@ class TestCheckAllPrices:
     def test_empty_db_does_not_error(self, engine):
         with patch("scheduler.engine", engine):
             check_all_prices()
+
+
+class TestCheckProductPricesUnknownPlugin:
+    def test_unknown_site_is_noop(self, session, product_with_variant):
+        product, variant = product_with_variant
+        product.site = "nonexistent_plugin"
+        session.commit()
+
+        count_before = session.query(PriceCheck).filter_by(variant_id=variant.id).count()
+        check_product_prices("test-motor", session=session)
+        count_after = session.query(PriceCheck).filter_by(variant_id=variant.id).count()
+
+        assert count_before == count_after
+
+
+class TestStartStopScheduler:
+    def test_start_scheduler_adds_job_and_starts(self):
+        with patch("scheduler.scheduler") as mock_sched:
+            start_scheduler(interval_hours=2)
+        mock_sched.add_job.assert_called_once_with(
+            check_all_prices,
+            "interval",
+            hours=2,
+            id="price_check",
+            replace_existing=True,
+        )
+        mock_sched.start.assert_called_once()
+
+    def test_start_scheduler_defaults_to_1_hour(self):
+        with patch("scheduler.scheduler") as mock_sched:
+            start_scheduler()
+        _, kwargs = mock_sched.add_job.call_args
+        assert kwargs["hours"] == 1
+
+    def test_stop_scheduler_shuts_down_when_running(self):
+        with patch("scheduler.scheduler") as mock_sched:
+            mock_sched.running = True
+            stop_scheduler()
+        mock_sched.shutdown.assert_called_once()
+
+    def test_stop_scheduler_noop_when_not_running(self):
+        with patch("scheduler.scheduler") as mock_sched:
+            mock_sched.running = False
+            stop_scheduler()
+        mock_sched.shutdown.assert_not_called()

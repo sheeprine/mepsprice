@@ -395,7 +395,7 @@ def delete_product(handle: str, db: Session = Depends(get_db), _=Depends(require
     return RedirectResponse("/", status_code=303)
 
 
-def main():
+def main():  # pragma: no cover
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 

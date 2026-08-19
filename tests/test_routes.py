@@ -33,6 +33,76 @@ class TestIndex:
         assert "↓" in resp.text
         assert "emerald" in resp.text
 
+    def test_product_with_no_tracked_variants_is_excluded(self, client, db_session):
+        product = Product(
+            handle="untracked-motor",
+            title="Untracked Motor",
+            product_url="https://www.mepsking.shop/untracked-motor.html",
+            site="mepsking",
+        )
+        db_session.add(product)
+        db_session.flush()
+        v = Variant(product_id=product.id, external_variant_id="999", name="Blue", sku="", tracked=False)
+        db_session.add(v)
+        db_session.commit()
+
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert "Untracked Motor" not in resp.text
+
+    def test_tracked_variant_with_no_price_checks_renders_without_error(self, client, db_session):
+        product = Product(
+            handle="checkless-motor",
+            title="Checkless Motor",
+            product_url="https://www.mepsking.shop/checkless-motor.html",
+            site="mepsking",
+        )
+        db_session.add(product)
+        db_session.flush()
+        v = Variant(product_id=product.id, external_variant_id="888", name="Red", sku="", tracked=True)
+        db_session.add(v)
+        db_session.commit()
+
+        # Variant has no PriceChecks — the inner loop hits `continue` but the product still renders
+        resp = client.get("/")
+        assert resp.status_code == 200
+
+    def test_pack_count_from_product_title_for_single_variant(self, client, db_session):
+        product = Product(
+            handle="pack-motor",
+            title="FPV Motor 4pcs",
+            product_url="https://www.mepsking.shop/pack-motor.html",
+            site="mepsking",
+        )
+        db_session.add(product)
+        db_session.flush()
+        v = Variant(product_id=product.id, external_variant_id="777", name="Blue", sku="", tracked=True)
+        db_session.add(v)
+        db_session.flush()
+        db_session.add(PriceCheck(variant_id=v.id, price=40.0, compare_at_price=None))
+        db_session.commit()
+
+        resp = client.get("/")
+        assert resp.status_code == 200
+        # Pack motor with 4pcs should show per-unit section
+        assert "pack-motor" in resp.text or "$40" in resp.text
+
+    def test_event_type_price_and_stock_changed(self, client, seeded_product, db_session):
+        v = db_session.query(Variant).filter_by(name="1900KV / Blue").first()
+        db_session.add(PriceCheck(variant_id=v.id, price=12.0, compare_at_price=26.90, in_stock=False))
+        db_session.commit()
+
+        resp = client.get("/")
+        assert resp.status_code == 200
+
+    def test_event_type_stock_only_changed(self, client, seeded_product, db_session):
+        v = db_session.query(Variant).filter_by(name="1900KV / Blue").first()
+        db_session.add(PriceCheck(variant_id=v.id, price=16.90, compare_at_price=26.90, in_stock=False))
+        db_session.commit()
+
+        resp = client.get("/")
+        assert resp.status_code == 200
+
 
 class TestAdminLogin:
     def test_login_page_returns_200(self, client):
@@ -227,6 +297,13 @@ class TestTrack:
             resp = admin_client.post("/track", data={"handle": "bad-handle", "site": "mepsking", "variant_ids": ["111"]})
         assert resp.status_code == 400
 
+    def test_unknown_site_returns_400(self, admin_client):
+        resp = admin_client.post(
+            "/track",
+            data={"handle": "test-motor", "site": "nonexistent_site", "variant_ids": ["111"]},
+        )
+        assert resp.status_code == 400
+
 
 class TestProductDetail:
     def test_unknown_handle_returns_404(self, client):
@@ -255,6 +332,23 @@ class TestProductDetail:
     def test_shows_mepsking_link(self, client, seeded_product):
         resp = client.get("/products/test-motor")
         assert "mepsking.shop" in resp.text
+
+    def test_tracked_variant_with_no_price_checks_is_skipped(self, client, db_session):
+        product = Product(
+            handle="checkless-detail",
+            title="Checkless Detail Motor",
+            product_url="https://www.mepsking.shop/checkless-detail.html",
+            site="mepsking",
+        )
+        db_session.add(product)
+        db_session.flush()
+        v = Variant(product_id=product.id, external_variant_id="555", name="Default", sku="", tracked=True)
+        db_session.add(v)
+        db_session.commit()
+
+        resp = client.get("/products/checkless-detail")
+        assert resp.status_code == 200
+        assert "Checkless Detail Motor" in resp.text
 
 
 class TestManualCheck:

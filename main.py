@@ -36,9 +36,16 @@ class AdminRequired(Exception):
     pass
 
 
+_POST_ONLY_SUFFIXES = ("/check", "/delete")
+
 @app.exception_handler(AdminRequired)
 async def admin_required_handler(request: Request, exc: AdminRequired):
-    return RedirectResponse(f"/admin/login?next={request.url.path}", status_code=303)
+    path = request.url.path
+    for suffix in _POST_ONLY_SUFFIXES:
+        if path.endswith(suffix):
+            path = path[: -len(suffix)]
+            break
+    return RedirectResponse(f"/admin/login?next={path}", status_code=303)
 
 
 def require_admin(request: Request) -> None:

@@ -77,7 +77,7 @@ templates.env.globals["time_ago"] = time_ago
 ACTIVITY_PAGE_SIZE = 10
 
 
-ACTIVITY_FILTERS = {"all", "price_drop", "price_increase", "out_of_stock", "back_in_stock"}
+ACTIVITY_FILTERS = {"all", "price", "stock"}
 
 _PrevCheck = aliased(PriceCheck)
 _prev_price_sq = (
@@ -164,14 +164,10 @@ def index(
 
     filter_type = filter if filter in ACTIVITY_FILTERS else "all"
     base_q = db.query(PriceCheck).join(Variant).join(Product)
-    if filter_type == "price_drop":
-        base_q = base_q.filter(PriceCheck.price < _prev_price_sq)
-    elif filter_type == "price_increase":
-        base_q = base_q.filter(PriceCheck.price > _prev_price_sq)
-    elif filter_type == "out_of_stock":
-        base_q = base_q.filter(PriceCheck.in_stock == False, _prev_stock_sq == True)  # noqa: E712
-    elif filter_type == "back_in_stock":
-        base_q = base_q.filter(PriceCheck.in_stock == True, _prev_stock_sq == False)  # noqa: E712
+    if filter_type == "price":
+        base_q = base_q.filter(PriceCheck.price != _prev_price_sq)
+    elif filter_type == "stock":
+        base_q = base_q.filter(PriceCheck.in_stock != _prev_stock_sq)  # noqa: E712
 
     total_checks = base_q.count()
     total_pages = max(1, (total_checks + ACTIVITY_PAGE_SIZE - 1) // ACTIVITY_PAGE_SIZE)

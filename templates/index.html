@@ -47,10 +47,8 @@
   <div class="flex flex-wrap gap-1.5 mb-3">
     {% set filters = [
       ("all", "All"),
-      ("price_drop", "↓ Price Drop"),
-      ("price_increase", "↑ Price Increase"),
-      ("out_of_stock", "Out of Stock"),
-      ("back_in_stock", "Back in Stock"),
+      ("price", "Price Change"),
+      ("stock", "Stock Change"),
     ] %}
     {% for fval, flabel in filters %}
     <a href="/?filter={{ fval }}"

@@ -36,7 +36,9 @@ def check_product_prices(handle: str, session: Session | None = None):
 
         variant_map = {v.external_variant_id: v for v in product.variants}
 
+        seen_external_ids = set()
         for v_data in data["variants"]:
+            seen_external_ids.add(v_data["external_variant_id"])
             variant = variant_map.get(v_data["external_variant_id"])
             if variant and variant.tracked:
                 last = (
@@ -60,6 +62,24 @@ def check_product_prices(handle: str, session: Session | None = None):
                     checked_at=now,
                 )
                 session.add(check)
+
+        for variant in product.variants:
+            if not variant.tracked or variant.external_variant_id in seen_external_ids:
+                continue
+            last = (
+                session.query(PriceCheck)
+                .filter_by(variant_id=variant.id)
+                .order_by(PriceCheck.checked_at.desc())
+                .first()
+            )
+            if last and last.in_stock:
+                session.add(PriceCheck(
+                    variant_id=variant.id,
+                    price=last.price,
+                    compare_at_price=last.compare_at_price,
+                    in_stock=False,
+                    checked_at=now,
+                ))
 
         if own_session:
             session.commit()

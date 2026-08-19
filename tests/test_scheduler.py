@@ -133,6 +133,7 @@ class TestCheckProductPrices:
         assert len(checks) == 1
 
     def test_ignores_unknown_variant_ids_from_api(self, session, product_with_variant):
+        _, variant = product_with_variant
         raw = {**FAKE_RAW, "hasVariant": [{
             "sku": "9999999999999999999",
             "productId": "UNKNOWN",
@@ -145,7 +146,47 @@ class TestCheckProductPrices:
             check_product_prices("test-motor", session=session)
         session.commit()
 
-        assert session.query(PriceCheck).count() == 1
+        # The tracked variant disappeared from the page → marked out-of-stock (2 checks total)
+        # The unknown variant from the page does NOT get a check
+        session.expire_all()
+        checks = session.query(PriceCheck).filter_by(variant_id=variant.id).order_by(PriceCheck.id).all()
+        assert len(checks) == 2
+        assert checks[-1].in_stock is False
+
+    def test_marks_missing_variant_as_out_of_stock(self, session, product_with_variant):
+        _, variant = product_with_variant
+        # Seed the variant as explicitly in-stock
+        session.query(PriceCheck).filter_by(variant_id=variant.id).delete()
+        session.add(PriceCheck(variant_id=variant.id, price=14.90, compare_at_price=26.90, in_stock=True))
+        session.commit()
+
+        # Page no longer lists the tracked variant
+        raw_empty = {**FAKE_RAW, "hasVariant": []}
+        with patch("scheduler.fetch_product", return_value=raw_empty):
+            check_product_prices("test-motor", session=session)
+        session.commit()
+
+        session.expire_all()
+        checks = session.query(PriceCheck).filter_by(variant_id=variant.id).order_by(PriceCheck.id).all()
+        assert len(checks) == 2
+        assert checks[-1].in_stock is False
+        assert checks[-1].price == 14.90
+
+    def test_does_not_duplicate_out_of_stock_for_already_missing_variant(self, session, product_with_variant):
+        _, variant = product_with_variant
+        # Variant already recorded as out-of-stock
+        session.query(PriceCheck).filter_by(variant_id=variant.id).delete()
+        session.add(PriceCheck(variant_id=variant.id, price=14.90, compare_at_price=26.90, in_stock=False))
+        session.commit()
+
+        raw_empty = {**FAKE_RAW, "hasVariant": []}
+        with patch("scheduler.fetch_product", return_value=raw_empty):
+            check_product_prices("test-motor", session=session)
+        session.commit()
+
+        session.expire_all()
+        checks = session.query(PriceCheck).filter_by(variant_id=variant.id).all()
+        assert len(checks) == 1
 
     def test_skips_price_check_when_unchanged(self, session, product_with_variant):
         _, variant = product_with_variant

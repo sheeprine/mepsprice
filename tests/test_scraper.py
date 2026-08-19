@@ -121,6 +121,29 @@ class TestParseProduct:
         v = parse_product(raw)["variants"][0]
         assert v["in_stock"] is False
 
+    def test_sold_out_variant(self):
+        raw = {
+            "@type": "ProductGroup",
+            "name": "Test",
+            "url": "https://www.mepsking.shop/test.html",
+            "hasVariant": [
+                {
+                    "sku": "111",
+                    "productId": "T-001",
+                    "name": "Test-Default",
+                    "image": [],
+                    "offers": {
+                        "availability": "https://schema.org/SoldOut",
+                        "priceSpecification": [
+                            {"@type": "UnitPriceSpecification", "price": 19.99, "priceCurrency": "USD"},
+                        ],
+                    },
+                }
+            ],
+        }
+        v = parse_product(raw)["variants"][0]
+        assert v["in_stock"] is False
+
     def test_variant_name_strips_product_prefix(self):
         result = parse_product(FAKE_PRODUCT_GROUP)
         assert result["variants"][0]["name"] == "1900KV / Blue"

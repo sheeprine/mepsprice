@@ -85,7 +85,7 @@ def parse_product(raw: dict) -> dict:
             price = 0.0
 
         availability = offers.get("availability", "")
-        in_stock = "OutOfStock" not in availability
+        in_stock = "OutOfStock" not in availability and "SoldOut" not in availability
 
         variants.append({
             "external_variant_id": external_id,

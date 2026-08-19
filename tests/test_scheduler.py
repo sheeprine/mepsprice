@@ -111,14 +111,17 @@ class TestCheckProductPrices:
 
         assert session.query(PriceCheck).count() == 0
 
-    def test_fetch_failure_is_noop(self, session, product_with_variant):
-        _, variant = product_with_variant
+    def test_fetch_failure_still_updates_last_checked_at(self, session, product_with_variant):
+        product, variant = product_with_variant
 
         plugin = get_plugin("mepsking")
         with patch.object(plugin, "fetch_product", return_value=None):
             check_product_prices("test-motor", session=session)
+        session.commit()
 
         session.expire_all()
+        product = session.query(Product).filter_by(handle="test-motor").first()
+        assert product.last_checked_at is not None
         checks = session.query(PriceCheck).filter_by(variant_id=variant.id).all()
         assert len(checks) == 1
 
@@ -240,6 +243,25 @@ class TestCheckAllPrices:
     def test_empty_db_does_not_error(self, engine):
         with patch("scheduler.engine", engine):
             check_all_prices()
+
+    def test_one_product_error_does_not_skip_others(self, engine, session):
+        for handle in ("motor-a", "motor-b"):
+            p = Product(handle=handle, title=handle.upper(), product_url=f"https://www.mepsking.shop/{handle}.html")
+            session.add(p)
+        session.commit()
+
+        call_order = []
+
+        def side_effect(handle, *args, **kwargs):
+            call_order.append(handle)
+            if handle == "motor-a":
+                raise RuntimeError("simulated failure")
+
+        with patch("scheduler.engine", engine):
+            with patch("scheduler.check_product_prices", side_effect=side_effect):
+                check_all_prices()
+
+        assert set(call_order) == {"motor-a", "motor-b"}
 
 
 class TestCheckProductPricesUnknownPlugin:

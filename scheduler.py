@@ -1,8 +1,11 @@
+import logging
 from datetime import datetime, timezone
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.orm import Session
 from database import engine, Product, Variant, PriceCheck
 from plugins import get_plugin
+
+logger = logging.getLogger(__name__)
 
 scheduler = BackgroundScheduler()
 
@@ -11,7 +14,10 @@ def check_all_prices():
     with Session(engine) as session:
         products = session.query(Product).all()
         for product in products:
-            check_product_prices(product.handle, session)
+            try:
+                check_product_prices(product.handle, session)
+            except Exception:
+                logger.exception("Error checking prices for %s", product.handle)
         session.commit()
 
 
@@ -29,14 +35,15 @@ def check_product_prices(handle: str, session: Session | None = None):
         if not plugin:
             return
 
+        now = datetime.now(timezone.utc)
+        product.last_checked_at = now
+
         raw = plugin.fetch_product(handle)
         if not raw:
+            logger.warning("Failed to fetch product %s from %s", handle, product.site)
             return
 
         data = plugin.parse_product(raw)
-        now = datetime.now(timezone.utc)
-
-        product.last_checked_at = now
 
         variant_map = {v.external_variant_id: v for v in product.variants}
 

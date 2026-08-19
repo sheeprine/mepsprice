@@ -5,6 +5,7 @@ import pytest
 
 from conftest import FAKE_RAW_PRODUCT
 from database import PriceCheck, Product, Variant
+from plugins import get_plugin
 
 
 class TestIndex:
@@ -100,19 +101,26 @@ class TestLookup:
         assert resp.status_code == 303
         assert "/admin/login" in resp.headers["location"]
 
+    def test_unsupported_url_shows_error(self, admin_client):
+        resp = admin_client.post("/lookup", data={"url": "https://www.example.com/product"})
+        assert resp.status_code == 200
+        assert "Unsupported URL" in resp.text
+
     def test_invalid_url_shows_error(self, admin_client):
         resp = admin_client.post("/lookup", data={"url": "https://www.mepsking.shop/drone-parts/motors"})
         assert resp.status_code == 200
         assert "Invalid URL" in resp.text
 
     def test_fetch_failure_shows_error(self, admin_client):
-        with patch("main.fetch_product", return_value=None):
+        plugin = get_plugin("mepsking")
+        with patch.object(plugin, "fetch_product", return_value=None):
             resp = admin_client.post("/lookup", data={"url": "https://www.mepsking.shop/nonexistent.html"})
         assert resp.status_code == 200
         assert "Could not fetch" in resp.text
 
     def test_valid_url_shows_preview(self, admin_client):
-        with patch("main.fetch_product", return_value=FAKE_RAW_PRODUCT):
+        plugin = get_plugin("mepsking")
+        with patch.object(plugin, "fetch_product", return_value=FAKE_RAW_PRODUCT):
             resp = admin_client.post("/lookup", data={"url": "https://www.mepsking.shop/test-motor.html"})
         assert resp.status_code == 200
         assert "Test FPV Motor" in resp.text
@@ -121,7 +129,8 @@ class TestLookup:
         assert "$16.90" in resp.text
 
     def test_preview_shows_variant_checkboxes(self, admin_client):
-        with patch("main.fetch_product", return_value=FAKE_RAW_PRODUCT):
+        plugin = get_plugin("mepsking")
+        with patch.object(plugin, "fetch_product", return_value=FAKE_RAW_PRODUCT):
             resp = admin_client.post("/lookup", data={"url": "https://www.mepsking.shop/test-motor.html"})
         assert 'type="checkbox"' in resp.text
         assert 'name="variant_ids"' in resp.text
@@ -129,22 +138,27 @@ class TestLookup:
 
 class TestTrack:
     def test_unauthenticated_redirects_to_login(self, client):
-        resp = client.post("/track", data={"handle": "test-motor", "variant_ids": ["1111111111111111111"]}, follow_redirects=False)
+        resp = client.post(
+            "/track",
+            data={"handle": "test-motor", "site": "mepsking", "variant_ids": ["1111111111111111111"]},
+            follow_redirects=False,
+        )
         assert resp.status_code == 303
         assert "/admin/login" in resp.headers["location"]
 
     def test_no_variants_redirects_to_add(self, admin_client):
         resp = admin_client.post(
             "/track",
-            data={"handle": "test-motor"},
+            data={"handle": "test-motor", "site": "mepsking"},
             follow_redirects=False,
         )
         assert resp.status_code == 303
         assert "/add" in resp.headers["location"]
 
     def test_creates_product_in_db(self, admin_client, db_session):
-        with patch("main.fetch_product", return_value=FAKE_RAW_PRODUCT):
-            admin_client.post("/track", data={"handle": "test-motor", "variant_ids": ["1111111111111111111"]})
+        plugin = get_plugin("mepsking")
+        with patch.object(plugin, "fetch_product", return_value=FAKE_RAW_PRODUCT):
+            admin_client.post("/track", data={"handle": "test-motor", "site": "mepsking", "variant_ids": ["1111111111111111111"]})
 
         db_session.expire_all()
         product = db_session.query(Product).filter_by(handle="test-motor").first()
@@ -153,8 +167,9 @@ class TestTrack:
         assert product.image_url == "https://img-meps.mepsking.top/material/1/test-motor.jpg"
 
     def test_creates_selected_variant_only(self, admin_client, db_session):
-        with patch("main.fetch_product", return_value=FAKE_RAW_PRODUCT):
-            admin_client.post("/track", data={"handle": "test-motor", "variant_ids": ["1111111111111111111"]})
+        plugin = get_plugin("mepsking")
+        with patch.object(plugin, "fetch_product", return_value=FAKE_RAW_PRODUCT):
+            admin_client.post("/track", data={"handle": "test-motor", "site": "mepsking", "variant_ids": ["1111111111111111111"]})
 
         db_session.expire_all()
         product = db_session.query(Product).filter_by(handle="test-motor").first()
@@ -164,8 +179,9 @@ class TestTrack:
         assert variants[0].name == "1900KV / Blue"
 
     def test_creates_initial_price_check(self, admin_client, db_session):
-        with patch("main.fetch_product", return_value=FAKE_RAW_PRODUCT):
-            admin_client.post("/track", data={"handle": "test-motor", "variant_ids": ["1111111111111111111"]})
+        plugin = get_plugin("mepsking")
+        with patch.object(plugin, "fetch_product", return_value=FAKE_RAW_PRODUCT):
+            admin_client.post("/track", data={"handle": "test-motor", "site": "mepsking", "variant_ids": ["1111111111111111111"]})
 
         db_session.expire_all()
         product = db_session.query(Product).filter_by(handle="test-motor").first()
@@ -176,18 +192,20 @@ class TestTrack:
         assert checks[0].compare_at_price == 26.90
 
     def test_redirects_to_product_page(self, admin_client):
-        with patch("main.fetch_product", return_value=FAKE_RAW_PRODUCT):
+        plugin = get_plugin("mepsking")
+        with patch.object(plugin, "fetch_product", return_value=FAKE_RAW_PRODUCT):
             resp = admin_client.post(
                 "/track",
-                data={"handle": "test-motor", "variant_ids": ["1111111111111111111"]},
+                data={"handle": "test-motor", "site": "mepsking", "variant_ids": ["1111111111111111111"]},
                 follow_redirects=False,
             )
         assert resp.status_code == 303
         assert resp.headers["location"].endswith("/products/test-motor")
 
     def test_tracking_multiple_variants(self, admin_client, db_session):
-        with patch("main.fetch_product", return_value=FAKE_RAW_PRODUCT):
-            admin_client.post("/track", data={"handle": "test-motor", "variant_ids": ["1111111111111111111", "2222222222222222222"]})
+        plugin = get_plugin("mepsking")
+        with patch.object(plugin, "fetch_product", return_value=FAKE_RAW_PRODUCT):
+            admin_client.post("/track", data={"handle": "test-motor", "site": "mepsking", "variant_ids": ["1111111111111111111", "2222222222222222222"]})
 
         db_session.expire_all()
         product = db_session.query(Product).filter_by(handle="test-motor").first()
@@ -195,16 +213,18 @@ class TestTrack:
         assert len(variants) == 2
 
     def test_retracking_existing_product_does_not_duplicate_variants(self, admin_client, seeded_product, db_session):
-        with patch("main.fetch_product", return_value=FAKE_RAW_PRODUCT):
-            admin_client.post("/track", data={"handle": "test-motor", "variant_ids": ["1111111111111111111"]})
+        plugin = get_plugin("mepsking")
+        with patch.object(plugin, "fetch_product", return_value=FAKE_RAW_PRODUCT):
+            admin_client.post("/track", data={"handle": "test-motor", "site": "mepsking", "variant_ids": ["1111111111111111111"]})
 
         db_session.expire_all()
         variants = db_session.query(Variant).filter_by(product_id=seeded_product.id).all()
         assert len(variants) == 2  # original 2, not duplicated
 
     def test_fetch_failure_returns_400(self, admin_client):
-        with patch("main.fetch_product", return_value=None):
-            resp = admin_client.post("/track", data={"handle": "bad-handle", "variant_ids": ["111"]})
+        plugin = get_plugin("mepsking")
+        with patch.object(plugin, "fetch_product", return_value=None):
+            resp = admin_client.post("/track", data={"handle": "bad-handle", "site": "mepsking", "variant_ids": ["111"]})
         assert resp.status_code == 400
 
 

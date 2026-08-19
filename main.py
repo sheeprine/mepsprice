@@ -3,7 +3,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 import json
 import os
-import re
 import secrets
 
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
@@ -13,7 +12,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 from database import init_db, get_db, Product, Variant, PriceCheck
-from scraper import extract_handle, fetch_product, parse_product
+from plugins import get_plugin_for_url, get_plugin
 from scheduler import start_scheduler, stop_scheduler, check_product_prices
 
 SESSION_SECRET = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
@@ -27,7 +26,7 @@ async def lifespan(app: FastAPI):
     stop_scheduler()
 
 
-app = FastAPI(title="MepsPrice", lifespan=lifespan)
+app = FastAPI(title="PriceTracker", lifespan=lifespan)
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
 templates = Jinja2Templates(directory="templates")
 
@@ -56,7 +55,6 @@ def require_admin(request: Request) -> None:
 def time_ago(dt: Optional[datetime]) -> str:
     if not dt:
         return "never"
-    # SQLite returns naive datetimes; treat them as UTC
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     delta = datetime.now(timezone.utc) - dt
@@ -75,21 +73,13 @@ def time_ago(dt: Optional[datetime]) -> str:
 templates.env.globals["time_ago"] = time_ago
 
 
-def extract_pack_count(name: str) -> int:
-    # Look for explicit pack/pcs patterns: "4pcs", "* 4pcs", "4 Pack", "x4"
-    m = re.search(r'(\d+)\s*(?:pcs|pack)', name, re.IGNORECASE)
-    if m:
-        n = int(m.group(1))
-        return n if n > 1 else 1
-    return 1
-
-
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request, db: Session = Depends(get_db)):
     products = db.query(Product).order_by(Product.created_at.desc()).all()
 
     product_summaries = []
     for product in products:
+        plugin = get_plugin(product.site or "mepsking")
         tracked = [v for v in product.variants if v.tracked]
         if not tracked:
             continue
@@ -110,9 +100,9 @@ def index(request: Request, db: Session = Depends(get_db)):
                 continue
             latest = checks[-1].price
             first = checks[0].price
-            pack_count = extract_pack_count(variant.name)
+            pack_count = plugin.extract_pack_count(variant.name)
             if pack_count == 1 and len(tracked) == 1:
-                pack_count = extract_pack_count(product.title)
+                pack_count = plugin.extract_pack_count(product.title)
             if pack_count > 1:
                 has_multi_pack = True
             per_unit = latest / pack_count
@@ -138,6 +128,7 @@ def index(request: Request, db: Session = Depends(get_db)):
                 "best_per_unit": best_per_unit,
                 "best_per_unit_variant": best_per_unit_variant,
                 "has_multi_pack": has_multi_pack,
+                "currency": plugin.currency if plugin else "$",
             }
         )
 
@@ -154,6 +145,7 @@ def index(request: Request, db: Session = Depends(get_db)):
     for check in recent_checks:
         variant = check.variant
         product = variant.product
+        plugin = get_plugin(product.site or "mepsking")
         prev = (
             db.query(PriceCheck)
             .filter(PriceCheck.variant_id == check.variant_id, PriceCheck.id < check.id)
@@ -164,7 +156,7 @@ def index(request: Request, db: Session = Depends(get_db)):
             event_type = "started"
         else:
             price_changed = check.price != prev.price
-            stock_changed = check.in_stock != prev.in_stock
+            stock_changed = (plugin and plugin.tracks_stock) and check.in_stock != prev.in_stock
             if price_changed and stock_changed:
                 event_type = "price_and_stock"
             elif price_changed:
@@ -177,6 +169,7 @@ def index(request: Request, db: Session = Depends(get_db)):
             "product": product,
             "prev": prev,
             "event_type": event_type,
+            "currency": plugin.currency if plugin else "$",
         })
 
     return templates.TemplateResponse(request, "index.html", {"summaries": product_summaries, "events": events})
@@ -213,22 +206,36 @@ def add_page(request: Request, error: Optional[str] = None, _=Depends(require_ad
 
 @app.post("/lookup", response_class=HTMLResponse)
 def lookup_product(request: Request, url: str = Form(...), _=Depends(require_admin)):
-    handle = extract_handle(url)
+    plugin = get_plugin_for_url(url)
+    if not plugin:
+        return templates.TemplateResponse(
+            request, "add.html",
+            {"error": "Unsupported URL. Paste a product URL from mepsking.shop or ampow.com."}
+        )
+
+    handle = plugin.extract_handle(url)
     if not handle:
-        return templates.TemplateResponse(request, "add.html", {"error": "Invalid URL. Please paste a valid mepsking.shop product URL."})
+        return templates.TemplateResponse(
+            request, "add.html",
+            {"error": f"Invalid URL. Could not extract a product handle from that {plugin.display_name} URL."}
+        )
 
-    raw = fetch_product(handle)
+    raw = plugin.fetch_product(handle)
     if not raw:
-        return templates.TemplateResponse(request, "add.html", {"error": f"Could not fetch product '{handle}'. Check the URL and try again."})
+        return templates.TemplateResponse(
+            request, "add.html",
+            {"error": f"Could not fetch product '{handle}'. Check the URL and try again."}
+        )
 
-    product_data = parse_product(raw)
-    return templates.TemplateResponse(request, "preview.html", {"product": product_data})
+    product_data = plugin.parse_product(raw)
+    return templates.TemplateResponse(request, "preview.html", {"product": product_data, "plugin": plugin})
 
 
 @app.post("/track")
 def track_product(
     request: Request,
     handle: str = Form(...),
+    site: str = Form(...),
     variant_ids: list[str] = Form(default=[]),
     db: Session = Depends(get_db),
     _=Depends(require_admin),
@@ -236,13 +243,17 @@ def track_product(
     if not variant_ids:
         return RedirectResponse(f"/add?error=Select+at+least+one+variant", status_code=303)
 
+    plugin = get_plugin(site)
+    if not plugin:
+        raise HTTPException(status_code=400, detail="Unknown site")
+
     existing = db.query(Product).filter_by(handle=handle).first()
 
-    raw = fetch_product(handle)
+    raw = plugin.fetch_product(handle)
     if not raw:
         raise HTTPException(status_code=400, detail="Could not fetch product")
 
-    data = parse_product(raw)
+    data = plugin.parse_product(raw)
 
     if not existing:
         product = Product(
@@ -250,6 +261,7 @@ def track_product(
             title=data["title"],
             image_url=data["image_url"],
             product_url=data["product_url"],
+            site=plugin.name,
         )
         db.add(product)
         db.flush()
@@ -296,6 +308,7 @@ def product_detail(request: Request, handle: str, db: Session = Depends(get_db))
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
+    plugin = get_plugin(product.site or "mepsking")
     tracked_variants = [v for v in product.variants if v.tracked]
 
     variant_data = []
@@ -317,9 +330,9 @@ def product_detail(request: Request, handle: str, db: Session = Depends(get_db))
         compare_at = checks[-1].compare_at_price
         in_stock = checks[-1].in_stock
         change_pct = round((latest_price - first_price) / first_price * 100, 1) if first_price else 0
-        pack_count = extract_pack_count(variant.name)
+        pack_count = plugin.extract_pack_count(variant.name)
         if pack_count == 1 and len(tracked_variants) == 1:
-            pack_count = extract_pack_count(product.title)
+            pack_count = plugin.extract_pack_count(product.title)
 
         variant_data.append(
             {
@@ -351,11 +364,11 @@ def product_detail(request: Request, handle: str, db: Session = Depends(get_db))
         )
 
     sorted_labels = sorted(all_labels)
-
     has_multi_pack = any(v["pack_count"] > 1 for v in variant_data)
 
     return templates.TemplateResponse(request, "product.html", {
         "product": product,
+        "plugin": plugin,
         "variant_data": variant_data,
         "chart_datasets_json": json.dumps(chart_datasets),
         "chart_labels_json": json.dumps(sorted_labels),

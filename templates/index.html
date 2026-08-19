@@ -12,7 +12,7 @@
     </svg>
   </div>
   <h2 class="text-xl font-semibold text-gray-700 mb-2">No products tracked yet</h2>
-  <p class="text-gray-500 mb-6">Paste a mepsking.shop product URL to start tracking its price.</p>
+  <p class="text-gray-500 mb-6">Paste a product URL from mepsking.shop or ampow.com to start tracking its price.</p>
   <a href="/add"
     class="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-medium px-6 py-3 rounded-lg transition-colors">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -60,9 +60,9 @@
         {% if s.min_price is not none %}
         <div class="flex items-end gap-2 mb-1">
           {% if s.has_multi_pack %}
-          <span class="text-2xl font-bold text-gray-900">${{ "%.2f"|format(s.best_per_unit) }}<span class="text-sm font-normal text-gray-400">/item</span></span>
+          <span class="text-2xl font-bold text-gray-900">{{ s.currency }}{{ "%.2f"|format(s.best_per_unit) }}<span class="text-sm font-normal text-gray-400">/item</span></span>
           {% else %}
-          <span class="text-2xl font-bold text-gray-900">${{ "%.2f"|format(s.min_price) }}</span>
+          <span class="text-2xl font-bold text-gray-900">{{ s.currency }}{{ "%.2f"|format(s.min_price) }}</span>
           {% endif %}
           {% if s.change_pct is not none %}
             {% if s.change_pct < 0 %}
@@ -149,7 +149,7 @@
           </div>
           <div class="mt-0.5 text-sm text-gray-600">
             {% if e.event_type == "started" %}
-              Tracking started at <span class="font-medium">${{ "%.2f"|format(e.check.price) }}</span>
+              Tracking started at <span class="font-medium">{{ e.currency }}{{ "%.2f"|format(e.check.price) }}</span>
               {% if not e.check.in_stock %}<span class="ml-1 text-red-500 text-xs font-medium">out of stock</span>{% endif %}
             {% elif e.event_type == "stock" %}
               {% if e.check.in_stock %}
@@ -157,15 +157,15 @@
               {% else %}
                 <span class="text-red-500 font-medium">Out of stock</span>
               {% endif %}
-              <span class="text-gray-400"> at ${{ "%.2f"|format(e.check.price) }}</span>
+              <span class="text-gray-400"> at {{ e.currency }}{{ "%.2f"|format(e.check.price) }}</span>
             {% elif e.event_type == "price" or e.event_type == "price_and_stock" %}
               Price
               {% if e.check.price < e.prev.price %}
-                <span class="text-emerald-600 font-medium">↓ ${{ "%.2f"|format(e.check.price) }}</span>
+                <span class="text-emerald-600 font-medium">↓ {{ e.currency }}{{ "%.2f"|format(e.check.price) }}</span>
               {% else %}
-                <span class="text-red-500 font-medium">↑ ${{ "%.2f"|format(e.check.price) }}</span>
+                <span class="text-red-500 font-medium">↑ {{ e.currency }}{{ "%.2f"|format(e.check.price) }}</span>
               {% endif %}
-              <span class="text-gray-400">from ${{ "%.2f"|format(e.prev.price) }}</span>
+              <span class="text-gray-400">from {{ e.currency }}{{ "%.2f"|format(e.prev.price) }}</span>
               {% if e.event_type == "price_and_stock" %}
                 <span class="ml-1 text-xs font-medium {% if e.check.in_stock %}text-emerald-600{% else %}text-red-500{% endif %}">
                   · {% if e.check.in_stock %}back in stock{% else %}out of stock{% endif %}

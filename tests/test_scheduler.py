@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from database import Base, Product, Variant, PriceCheck
+from plugins import get_plugin
 from scheduler import check_product_prices, check_all_prices
 
 FAKE_RAW = {
@@ -80,7 +81,8 @@ class TestCheckProductPrices:
     def test_creates_new_price_check(self, session, product_with_variant):
         product, variant = product_with_variant
 
-        with patch("scheduler.fetch_product", return_value=FAKE_RAW):
+        plugin = get_plugin("mepsking")
+        with patch.object(plugin, "fetch_product", return_value=FAKE_RAW):
             check_product_prices("test-motor", session=session)
         session.commit()
 
@@ -94,7 +96,8 @@ class TestCheckProductPrices:
         product, _ = product_with_variant
         assert product.last_checked_at is None
 
-        with patch("scheduler.fetch_product", return_value=FAKE_RAW):
+        plugin = get_plugin("mepsking")
+        with patch.object(plugin, "fetch_product", return_value=FAKE_RAW):
             check_product_prices("test-motor", session=session)
         session.commit()
 
@@ -103,8 +106,7 @@ class TestCheckProductPrices:
         assert product.last_checked_at is not None
 
     def test_unknown_handle_is_noop(self, session):
-        with patch("scheduler.fetch_product", return_value=FAKE_RAW):
-            check_product_prices("nonexistent", session=session)
+        check_product_prices("nonexistent", session=session)
         session.commit()
 
         assert session.query(PriceCheck).count() == 0
@@ -112,7 +114,8 @@ class TestCheckProductPrices:
     def test_fetch_failure_is_noop(self, session, product_with_variant):
         _, variant = product_with_variant
 
-        with patch("scheduler.fetch_product", return_value=None):
+        plugin = get_plugin("mepsking")
+        with patch.object(plugin, "fetch_product", return_value=None):
             check_product_prices("test-motor", session=session)
 
         session.expire_all()
@@ -124,7 +127,8 @@ class TestCheckProductPrices:
         variant.tracked = False
         session.commit()
 
-        with patch("scheduler.fetch_product", return_value=FAKE_RAW):
+        plugin = get_plugin("mepsking")
+        with patch.object(plugin, "fetch_product", return_value=FAKE_RAW):
             check_product_prices("test-motor", session=session)
         session.commit()
 
@@ -142,7 +146,8 @@ class TestCheckProductPrices:
             "offers": {"priceSpecification": [{"price": 50.00, "priceCurrency": "USD"}]},
         }]}
 
-        with patch("scheduler.fetch_product", return_value=raw):
+        plugin = get_plugin("mepsking")
+        with patch.object(plugin, "fetch_product", return_value=raw):
             check_product_prices("test-motor", session=session)
         session.commit()
 
@@ -162,7 +167,8 @@ class TestCheckProductPrices:
 
         # Page no longer lists the tracked variant
         raw_empty = {**FAKE_RAW, "hasVariant": []}
-        with patch("scheduler.fetch_product", return_value=raw_empty):
+        plugin = get_plugin("mepsking")
+        with patch.object(plugin, "fetch_product", return_value=raw_empty):
             check_product_prices("test-motor", session=session)
         session.commit()
 
@@ -180,7 +186,8 @@ class TestCheckProductPrices:
         session.commit()
 
         raw_empty = {**FAKE_RAW, "hasVariant": []}
-        with patch("scheduler.fetch_product", return_value=raw_empty):
+        plugin = get_plugin("mepsking")
+        with patch.object(plugin, "fetch_product", return_value=raw_empty):
             check_product_prices("test-motor", session=session)
         session.commit()
 
@@ -195,7 +202,8 @@ class TestCheckProductPrices:
         session.add(PriceCheck(variant_id=variant.id, price=14.90, compare_at_price=26.90))
         session.commit()
 
-        with patch("scheduler.fetch_product", return_value=FAKE_RAW):
+        plugin = get_plugin("mepsking")
+        with patch.object(plugin, "fetch_product", return_value=FAKE_RAW):
             check_product_prices("test-motor", session=session)
         session.commit()
 
@@ -204,8 +212,9 @@ class TestCheckProductPrices:
         assert len(checks) == 1
 
     def test_own_session_path(self, engine, product_with_variant):
+        plugin = get_plugin("mepsking")
         with patch("scheduler.engine", engine):
-            with patch("scheduler.fetch_product", return_value=FAKE_RAW):
+            with patch.object(plugin, "fetch_product", return_value=FAKE_RAW):
                 check_product_prices("test-motor")
 
         _, variant = product_with_variant

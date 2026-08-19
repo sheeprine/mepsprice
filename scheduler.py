@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.orm import Session
 from database import engine, Product, Variant, PriceCheck
-from scraper import fetch_product, parse_product
+from plugins import get_plugin
 
 scheduler = BackgroundScheduler()
 
@@ -21,16 +21,20 @@ def check_product_prices(handle: str, session: Session | None = None):
         session = Session(engine)
 
     try:
-        raw = fetch_product(handle)
-        if not raw:
-            return
-
-        data = parse_product(raw)
-        now = datetime.now(timezone.utc)
-
         product = session.query(Product).filter_by(handle=handle).first()
         if not product:
             return
+
+        plugin = get_plugin(product.site or "mepsking")
+        if not plugin:
+            return
+
+        raw = plugin.fetch_product(handle)
+        if not raw:
+            return
+
+        data = plugin.parse_product(raw)
+        now = datetime.now(timezone.utc)
 
         product.last_checked_at = now
 
@@ -47,12 +51,13 @@ def check_product_prices(handle: str, session: Session | None = None):
                     .order_by(PriceCheck.checked_at.desc())
                     .first()
                 )
-                if (
+                price_same = (
                     last
                     and last.price == v_data["price"]
                     and last.compare_at_price == v_data["compare_at_price"]
-                    and last.in_stock == v_data["in_stock"]
-                ):
+                )
+                stock_same = not plugin.tracks_stock or (last and last.in_stock == v_data["in_stock"])
+                if price_same and stock_same:
                     continue
                 check = PriceCheck(
                     variant_id=variant.id,
@@ -63,23 +68,24 @@ def check_product_prices(handle: str, session: Session | None = None):
                 )
                 session.add(check)
 
-        for variant in product.variants:
-            if not variant.tracked or variant.external_variant_id in seen_external_ids:
-                continue
-            last = (
-                session.query(PriceCheck)
-                .filter_by(variant_id=variant.id)
-                .order_by(PriceCheck.checked_at.desc())
-                .first()
-            )
-            if last and last.in_stock:
-                session.add(PriceCheck(
-                    variant_id=variant.id,
-                    price=last.price,
-                    compare_at_price=last.compare_at_price,
-                    in_stock=False,
-                    checked_at=now,
-                ))
+        if plugin.tracks_stock:
+            for variant in product.variants:
+                if not variant.tracked or variant.external_variant_id in seen_external_ids:
+                    continue
+                last = (
+                    session.query(PriceCheck)
+                    .filter_by(variant_id=variant.id)
+                    .order_by(PriceCheck.checked_at.desc())
+                    .first()
+                )
+                if last and last.in_stock:
+                    session.add(PriceCheck(
+                        variant_id=variant.id,
+                        price=last.price,
+                        compare_at_price=last.compare_at_price,
+                        in_stock=False,
+                        checked_at=now,
+                    ))
 
         if own_session:
             session.commit()

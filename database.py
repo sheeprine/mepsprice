@@ -26,6 +26,7 @@ class Product(Base):
     title = Column(String, nullable=False)
     image_url = Column(String)
     product_url = Column(String, nullable=False)
+    site = Column(String, nullable=False, default="mepsking", server_default="mepsking")
     created_at = Column(DateTime, default=_utcnow)
     last_checked_at = Column(DateTime)
 
@@ -67,10 +68,17 @@ def get_db():
 
 def _migrate_db():
     with engine.connect() as conn:
-        existing_columns = {col["name"] for col in inspect(engine).get_columns("price_checks")}
-        if "in_stock" not in existing_columns:
+        price_check_cols = {col["name"] for col in inspect(engine).get_columns("price_checks")}
+        if "in_stock" not in price_check_cols:
             conn.execute(text(
                 "ALTER TABLE price_checks ADD COLUMN in_stock BOOLEAN NOT NULL DEFAULT 1"
+            ))
+            conn.commit()
+
+        product_cols = {col["name"] for col in inspect(engine).get_columns("products")}
+        if "site" not in product_cols:
+            conn.execute(text(
+                "ALTER TABLE products ADD COLUMN site VARCHAR NOT NULL DEFAULT 'mepsking'"
             ))
             conn.commit()
 

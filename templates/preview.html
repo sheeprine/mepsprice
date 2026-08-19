@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}MepsPrice — Select Variants{% endblock %}
+{% block title %}PriceTracker — Select Variants{% endblock %}
 
 {% block content %}
 <div class="max-w-2xl mx-auto">
@@ -24,13 +24,14 @@
         <h2 class="font-semibold text-gray-800">{{ product.title }}</h2>
         <a href="{{ product.product_url }}" target="_blank"
           class="text-xs text-brand-600 hover:underline mt-1 inline-block">
-          View on mepsking.shop ↗
+          View on {{ plugin.display_name }} ↗
         </a>
       </div>
     </div>
 
     <form method="post" action="/track">
       <input type="hidden" name="handle" value="{{ product.handle }}"/>
+      <input type="hidden" name="site" value="{{ plugin.name }}"/>
 
       <div class="divide-y divide-gray-100">
         {% for variant in product.variants %}
@@ -49,9 +50,9 @@
             {% endif %}
           </div>
           <div class="text-right shrink-0">
-            <div class="font-semibold text-gray-900">${{ "%.2f"|format(variant.price) }}</div>
+            <div class="font-semibold text-gray-900">{{ plugin.currency }}{{ "%.2f"|format(variant.price) }}</div>
             {% if variant.compare_at_price and variant.compare_at_price > variant.price %}
-            <div class="text-xs text-gray-400 line-through">${{ "%.2f"|format(variant.compare_at_price) }}</div>
+            <div class="text-xs text-gray-400 line-through">{{ plugin.currency }}{{ "%.2f"|format(variant.compare_at_price) }}</div>
             {% endif %}
           </div>
         </label>

@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
     stop_scheduler()
 
 
-app = FastAPI(title="PriceTracker", lifespan=lifespan)
+app = FastAPI(title="FPV Prices", lifespan=lifespan)
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
 templates = Jinja2Templates(directory="templates")
 

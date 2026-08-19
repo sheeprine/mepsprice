@@ -1,7 +1,7 @@
 [project]
-name = "mepsprice"
+name = "fpvprices"
 version = "0.1.0"
-description = "Price tracker for mepsking.shop"
+description = "FPV price tracker for mepsking.shop and ampow.com"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mepsprice = "main:main"
+fpvprices = "main:main"
 
 [dependency-groups]
 dev = ["pytest>=8"]

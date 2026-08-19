@@ -6,7 +6,7 @@ from plugins import SitePlugin
 
 MEPSKING_BASE = "https://www.mepsking.shop"
 _HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; PriceTracker/1.0; price tracker)",
+    "User-Agent": "Mozilla/5.0 (compatible; FPVPrices/1.0; price tracker)",
     "Accept": "text/html,application/xhtml+xml",
 }
 

@@ -10,7 +10,7 @@ from sqlalchemy.orm import DeclarativeBase, relationship, Session
 
 import os
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./mepsprice.db")
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./fpvprices.db")
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
 

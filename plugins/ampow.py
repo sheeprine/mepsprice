@@ -5,7 +5,7 @@ from plugins import SitePlugin
 
 AMPOW_BASE = "https://www.ampow.com"
 _HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; PriceTracker/1.0; price tracker)",
+    "User-Agent": "Mozilla/5.0 (compatible; FPVPrices/1.0; price tracker)",
     "Accept": "application/json",
 }
 

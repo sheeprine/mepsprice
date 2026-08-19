@@ -11,6 +11,7 @@ RUN uv sync --frozen --no-dev
 
 # Copy application source
 COPY main.py database.py scraper.py scheduler.py ./
+COPY plugins/ plugins/
 COPY templates/ templates/
 
 # Persistent storage for the SQLite database
@@ -20,7 +21,7 @@ RUN mkdir -p /data && \
 
 USER appuser
 
-ENV DATABASE_URL=sqlite:////data/mepsprice.db
+ENV DATABASE_URL=sqlite:////data/fpvprices.db
 ENV UV_NO_CACHE=1
 
 EXPOSE 8000

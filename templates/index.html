@@ -100,5 +100,88 @@
   {% endfor %}
 </div>
 
+{% if events %}
+<div class="mt-10">
+  <h2 class="text-xl font-bold text-gray-800 mb-4">Recent Activity</h2>
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <ul class="divide-y divide-gray-100">
+      {% for e in events %}
+      <li class="px-4 py-3 flex items-start gap-3">
+
+        {% if e.event_type == "started" %}
+        <div class="mt-0.5 w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+          <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+        </div>
+        {% elif e.event_type == "stock" %}
+          {% if e.check.in_stock %}
+          <div class="mt-0.5 w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+            <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+          </div>
+          {% else %}
+          <div class="mt-0.5 w-7 h-7 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+            <svg class="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </div>
+          {% endif %}
+        {% elif e.check.price < e.prev.price %}
+        <div class="mt-0.5 w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+          <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </div>
+        {% else %}
+        <div class="mt-0.5 w-7 h-7 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+          <svg class="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+          </svg>
+        </div>
+        {% endif %}
+
+        <div class="flex-1 min-w-0">
+          <div class="text-sm">
+            <a href="/products/{{ e.product.handle }}" class="font-medium text-gray-800 hover:text-brand-600">{{ e.product.title }}</a>
+            <span class="text-gray-400"> — {{ e.variant.name }}</span>
+          </div>
+          <div class="mt-0.5 text-sm text-gray-600">
+            {% if e.event_type == "started" %}
+              Tracking started at <span class="font-medium">${{ "%.2f"|format(e.check.price) }}</span>
+              {% if not e.check.in_stock %}<span class="ml-1 text-red-500 text-xs font-medium">out of stock</span>{% endif %}
+            {% elif e.event_type == "stock" %}
+              {% if e.check.in_stock %}
+                <span class="text-emerald-600 font-medium">Back in stock</span>
+              {% else %}
+                <span class="text-red-500 font-medium">Out of stock</span>
+              {% endif %}
+              <span class="text-gray-400"> at ${{ "%.2f"|format(e.check.price) }}</span>
+            {% elif e.event_type == "price" or e.event_type == "price_and_stock" %}
+              Price
+              {% if e.check.price < e.prev.price %}
+                <span class="text-emerald-600 font-medium">↓ ${{ "%.2f"|format(e.check.price) }}</span>
+              {% else %}
+                <span class="text-red-500 font-medium">↑ ${{ "%.2f"|format(e.check.price) }}</span>
+              {% endif %}
+              <span class="text-gray-400">from ${{ "%.2f"|format(e.prev.price) }}</span>
+              {% if e.event_type == "price_and_stock" %}
+                <span class="ml-1 text-xs font-medium {% if e.check.in_stock %}text-emerald-600{% else %}text-red-500{% endif %}">
+                  · {% if e.check.in_stock %}back in stock{% else %}out of stock{% endif %}
+                </span>
+              {% endif %}
+            {% endif %}
+          </div>
+        </div>
+
+        <span class="text-xs text-gray-400 shrink-0 mt-1">{{ time_ago(e.check.checked_at) }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endif %}
+
 {% endif %}
 {% endblock %}

@@ -134,7 +134,45 @@ def index(request: Request, db: Session = Depends(get_db)):
             }
         )
 
-    return templates.TemplateResponse(request, "index.html", {"summaries": product_summaries})
+    recent_checks = (
+        db.query(PriceCheck)
+        .join(Variant)
+        .join(Product)
+        .order_by(PriceCheck.checked_at.desc())
+        .limit(20)
+        .all()
+    )
+
+    events = []
+    for check in recent_checks:
+        variant = check.variant
+        product = variant.product
+        prev = (
+            db.query(PriceCheck)
+            .filter(PriceCheck.variant_id == check.variant_id, PriceCheck.id < check.id)
+            .order_by(PriceCheck.id.desc())
+            .first()
+        )
+        if prev is None:
+            event_type = "started"
+        else:
+            price_changed = check.price != prev.price
+            stock_changed = check.in_stock != prev.in_stock
+            if price_changed and stock_changed:
+                event_type = "price_and_stock"
+            elif price_changed:
+                event_type = "price"
+            else:
+                event_type = "stock"
+        events.append({
+            "check": check,
+            "variant": variant,
+            "product": product,
+            "prev": prev,
+            "event_type": event_type,
+        })
+
+    return templates.TemplateResponse(request, "index.html", {"summaries": product_summaries, "events": events})
 
 
 @app.get("/admin/login", response_class=HTMLResponse)

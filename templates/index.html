@@ -24,27 +24,46 @@
 
 {% else %}
 
-{% if events or page > 1 %}
+{% if events or page > 1 or filter_type != "all" %}
 <div class="mb-10">
-  <div class="flex items-center justify-between mb-3">
+  <div class="flex items-center justify-between mb-2">
     <h2 class="text-lg font-bold text-gray-800">Recent Activity</h2>
     {% if total_pages > 1 %}
     <div class="flex items-center gap-1 text-sm">
       {% if page > 1 %}
-      <a href="/?page={{ page - 1 }}" class="px-2 py-1 rounded text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors">← Newer</a>
+      <a href="/?page={{ page - 1 }}&filter={{ filter_type }}" class="px-2 py-1 rounded text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors">← Newer</a>
       {% else %}
       <span class="px-2 py-1 text-gray-300 cursor-default">← Newer</span>
       {% endif %}
       <span class="px-2 py-1 text-gray-400">{{ page }} / {{ total_pages }}</span>
       {% if page < total_pages %}
-      <a href="/?page={{ page + 1 }}" class="px-2 py-1 rounded text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors">Older →</a>
+      <a href="/?page={{ page + 1 }}&filter={{ filter_type }}" class="px-2 py-1 rounded text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors">Older →</a>
       {% else %}
       <span class="px-2 py-1 text-gray-300 cursor-default">Older →</span>
       {% endif %}
     </div>
     {% endif %}
   </div>
+  <div class="flex flex-wrap gap-1.5 mb-3">
+    {% set filters = [
+      ("all", "All"),
+      ("price_drop", "↓ Price Drop"),
+      ("price_increase", "↑ Price Increase"),
+      ("out_of_stock", "Out of Stock"),
+      ("back_in_stock", "Back in Stock"),
+    ] %}
+    {% for fval, flabel in filters %}
+    <a href="/?filter={{ fval }}"
+      class="px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors
+        {% if filter_type == fval %}bg-brand-600 text-white border-brand-600{% else %}text-gray-500 border-gray-300 hover:border-brand-400 hover:text-brand-600{% endif %}">
+      {{ flabel }}
+    </a>
+    {% endfor %}
+  </div>
   <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    {% if not events %}
+    <p class="px-4 py-6 text-sm text-gray-400 text-center">No activity matches this filter.</p>
+    {% endif %}
     <ul class="divide-y divide-gray-100">
       {% for e in events %}
       <li class="px-3 py-2 flex items-center gap-2.5">

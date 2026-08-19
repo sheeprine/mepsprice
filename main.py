@@ -5,10 +5,11 @@ import json
 import os
 import secrets
 
-from fastapi import FastAPI, Request, Form, Depends, HTTPException
+from fastapi import FastAPI, Request, Form, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.orm import Session, aliased
 from starlette.middleware.sessions import SessionMiddleware
 
 from database import init_db, get_db, Product, Variant, PriceCheck
@@ -76,8 +77,34 @@ templates.env.globals["time_ago"] = time_ago
 ACTIVITY_PAGE_SIZE = 10
 
 
+ACTIVITY_FILTERS = {"all", "price_drop", "price_increase", "out_of_stock", "back_in_stock"}
+
+_PrevCheck = aliased(PriceCheck)
+_prev_price_sq = (
+    select(_PrevCheck.price)
+    .where(_PrevCheck.variant_id == PriceCheck.variant_id, _PrevCheck.id < PriceCheck.id)
+    .order_by(_PrevCheck.id.desc())
+    .limit(1)
+    .correlate(PriceCheck)
+    .scalar_subquery()
+)
+_prev_stock_sq = (
+    select(_PrevCheck.in_stock)
+    .where(_PrevCheck.variant_id == PriceCheck.variant_id, _PrevCheck.id < PriceCheck.id)
+    .order_by(_PrevCheck.id.desc())
+    .limit(1)
+    .correlate(PriceCheck)
+    .scalar_subquery()
+)
+
+
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, page: int = 1, db: Session = Depends(get_db)):
+def index(
+    request: Request,
+    page: int = 1,
+    filter: str = Query(default="all", alias="filter"),
+    db: Session = Depends(get_db),
+):
     products = db.query(Product).order_by(Product.created_at.desc()).all()
 
     product_summaries = []
@@ -135,15 +162,24 @@ def index(request: Request, page: int = 1, db: Session = Depends(get_db)):
             }
         )
 
-    total_checks = db.query(PriceCheck).join(Variant).join(Product).count()
+    filter_type = filter if filter in ACTIVITY_FILTERS else "all"
+    base_q = db.query(PriceCheck).join(Variant).join(Product)
+    if filter_type == "price_drop":
+        base_q = base_q.filter(PriceCheck.price < _prev_price_sq)
+    elif filter_type == "price_increase":
+        base_q = base_q.filter(PriceCheck.price > _prev_price_sq)
+    elif filter_type == "out_of_stock":
+        base_q = base_q.filter(PriceCheck.in_stock == False, _prev_stock_sq == True)  # noqa: E712
+    elif filter_type == "back_in_stock":
+        base_q = base_q.filter(PriceCheck.in_stock == True, _prev_stock_sq == False)  # noqa: E712
+
+    total_checks = base_q.count()
     total_pages = max(1, (total_checks + ACTIVITY_PAGE_SIZE - 1) // ACTIVITY_PAGE_SIZE)
     page = max(1, min(page, total_pages))
     offset = (page - 1) * ACTIVITY_PAGE_SIZE
 
     recent_checks = (
-        db.query(PriceCheck)
-        .join(Variant)
-        .join(Product)
+        base_q
         .order_by(PriceCheck.checked_at.desc())
         .offset(offset)
         .limit(ACTIVITY_PAGE_SIZE)
@@ -186,6 +222,7 @@ def index(request: Request, page: int = 1, db: Session = Depends(get_db)):
         "events": events,
         "page": page,
         "total_pages": total_pages,
+        "filter_type": filter_type,
     })
 
 

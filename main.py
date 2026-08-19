@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, aliased
 from starlette.middleware.sessions import SessionMiddleware
 
 from database import init_db, get_db, Product, Variant, PriceCheck
-from plugins import get_plugin_for_url, get_plugin
+from plugins import get_plugin_for_url, get_plugin, get_all_plugins
 from scheduler import start_scheduler, stop_scheduler, check_product_prices
 
 SESSION_SECRET = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
@@ -213,12 +213,14 @@ def index(
             "currency": plugin.currency if plugin else "$",
         })
 
+    site_names = {name: p.display_name for name, p in get_all_plugins().items()}
     return templates.TemplateResponse(request, "index.html", {
         "summaries": product_summaries,
         "events": events,
         "page": page,
         "total_pages": total_pages,
         "filter_type": filter_type,
+        "site_names": site_names,
     })
 
 
@@ -257,7 +259,7 @@ def lookup_product(request: Request, url: str = Form(...), _=Depends(require_adm
     if not plugin:
         return templates.TemplateResponse(
             request, "add.html",
-            {"error": "Unsupported URL. Paste a product URL from mepsking.shop or ampow.com."}
+            {"error": "Unsupported URL. Check that the URL is from a supported site."}
         )
 
     handle = plugin.extract_handle(url)

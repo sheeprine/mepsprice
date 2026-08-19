@@ -47,10 +47,16 @@ def get_plugin(name: str) -> Optional["SitePlugin"]:
     return _registry.get(name)
 
 
+def get_all_plugins() -> dict[str, "SitePlugin"]:
+    return dict(_registry)
+
+
 # Register built-in plugins — placed at the bottom so SitePlugin is defined
 # before the submodules import it (safe circular-import pattern).
 from plugins.mepsking import MepskingPlugin  # noqa: E402
 from plugins.ampow import AmpowPlugin  # noqa: E402
+from plugins.dfr import DFRPlugin  # noqa: E402
 
 register(MepskingPlugin())
 register(AmpowPlugin())
+register(DFRPlugin())

@@ -73,8 +73,11 @@ def time_ago(dt: Optional[datetime]) -> str:
 templates.env.globals["time_ago"] = time_ago
 
 
+ACTIVITY_PAGE_SIZE = 10
+
+
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, db: Session = Depends(get_db)):
+def index(request: Request, page: int = 1, db: Session = Depends(get_db)):
     products = db.query(Product).order_by(Product.created_at.desc()).all()
 
     product_summaries = []
@@ -132,12 +135,18 @@ def index(request: Request, db: Session = Depends(get_db)):
             }
         )
 
+    total_checks = db.query(PriceCheck).join(Variant).join(Product).count()
+    total_pages = max(1, (total_checks + ACTIVITY_PAGE_SIZE - 1) // ACTIVITY_PAGE_SIZE)
+    page = max(1, min(page, total_pages))
+    offset = (page - 1) * ACTIVITY_PAGE_SIZE
+
     recent_checks = (
         db.query(PriceCheck)
         .join(Variant)
         .join(Product)
         .order_by(PriceCheck.checked_at.desc())
-        .limit(20)
+        .offset(offset)
+        .limit(ACTIVITY_PAGE_SIZE)
         .all()
     )
 
@@ -172,7 +181,12 @@ def index(request: Request, db: Session = Depends(get_db)):
             "currency": plugin.currency if plugin else "$",
         })
 
-    return templates.TemplateResponse(request, "index.html", {"summaries": product_summaries, "events": events})
+    return templates.TemplateResponse(request, "index.html", {
+        "summaries": product_summaries,
+        "events": events,
+        "page": page,
+        "total_pages": total_pages,
+    })
 
 
 @app.get("/admin/login", response_class=HTMLResponse)

@@ -26,8 +26,8 @@ FAKE_RAW = {
 
 
 class TestAmpowTracksStock:
-    def test_tracks_stock_is_true(self):
-        assert plugin.tracks_stock is True
+    def test_tracks_stock_is_false(self):
+        assert plugin.tracks_stock is False
 
 
 class TestAmpowParseProduct:
@@ -53,31 +53,8 @@ class TestAmpowParseProduct:
         v = plugin.parse_product(raw)["variants"][0]
         assert v["in_stock"] is True
 
-    def test_out_of_stock_when_deny_policy_and_zero_qty(self):
+    def test_always_in_stock_regardless_of_inventory_qty(self):
         raw = {**FAKE_RAW, "variants": [{**FAKE_RAW["variants"][0], "inventory_quantity": 0}]}
-        v = plugin.parse_product(raw)["variants"][0]
-        assert v["in_stock"] is False
-
-    def test_out_of_stock_when_deny_policy_and_negative_qty(self):
-        raw = {**FAKE_RAW, "variants": [{**FAKE_RAW["variants"][0], "inventory_quantity": -3}]}
-        v = plugin.parse_product(raw)["variants"][0]
-        assert v["in_stock"] is False
-
-    def test_in_stock_when_continue_policy_regardless_of_qty(self):
-        raw = {**FAKE_RAW, "variants": [{
-            **FAKE_RAW["variants"][0],
-            "inventory_policy": "continue",
-            "inventory_quantity": 0,
-        }]}
-        v = plugin.parse_product(raw)["variants"][0]
-        assert v["in_stock"] is True
-
-    def test_in_stock_when_no_inventory_management(self):
-        raw = {**FAKE_RAW, "variants": [{
-            **FAKE_RAW["variants"][0],
-            "inventory_management": None,
-            "inventory_quantity": 0,
-        }]}
         v = plugin.parse_product(raw)["variants"][0]
         assert v["in_stock"] is True
 

@@ -211,6 +211,7 @@ def index(
             "prev": prev,
             "event_type": event_type,
             "currency": plugin.currency if plugin else "$",
+            "tracks_stock": plugin.tracks_stock if plugin else False,
         })
 
     site_names = {name: p.display_name for name, p in get_all_plugins().items()}

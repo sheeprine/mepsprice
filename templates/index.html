@@ -106,7 +106,7 @@
           <span class="text-gray-500 shrink-0">
             {% if e.event_type == "started" %}
               started at <span class="font-medium text-gray-700">{{ e.currency }}{{ "%.2f"|format(e.check.price) }}</span>
-              {% if not e.check.in_stock %}<span class="text-red-500 font-medium">· OOS</span>{% endif %}
+              {% if e.tracks_stock and not e.check.in_stock %}<span class="text-red-500 font-medium">· OOS</span>{% endif %}
             {% elif e.event_type == "stock" %}
               {% if e.check.in_stock %}
                 <span class="text-emerald-600 font-medium">back in stock</span>

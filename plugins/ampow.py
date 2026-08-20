@@ -14,7 +14,7 @@ class AmpowPlugin(SitePlugin):
     name = "ampow"
     display_name = "Ampow"
     currency = "€"
-    tracks_stock = True
+    tracks_stock = False
 
     def can_handle(self, url: str) -> bool:
         return "ampow.com" in url
@@ -44,20 +44,13 @@ class AmpowPlugin(SitePlugin):
         for v in raw.get("variants", []):
             price = float(v["price"]) if v.get("price") else 0.0
             compare_at = float(v["compare_at_price"]) if v.get("compare_at_price") else None
-            inv_mgmt = v.get("inventory_management")
-            inv_policy = v.get("inventory_policy", "deny")
-            inv_qty = v.get("inventory_quantity", 0)
-            if inv_mgmt is None or inv_policy == "continue":
-                in_stock = True
-            else:
-                in_stock = inv_qty > 0
             variants.append({
                 "external_variant_id": str(v["id"]),
                 "name": v.get("title", "Default"),
                 "sku": v.get("sku", ""),
                 "price": price,
                 "compare_at_price": compare_at,
-                "in_stock": in_stock,
+                "in_stock": True,
             })
 
         return {
